@@ -3,9 +3,9 @@ warnings.filterwarnings('ignore')
 from ultralytics import YOLO
 
 if __name__ == '__main__':
-    model = YOLO('cfg/yolo11.yaml') 
-    # model.load('yolo11n.pt') # loading pretrain weights
-    model.train(data='/dataset/hit-uav/dataset.yaml',
+    model = YOLO('cfg/yolo11-C3k2-DCNV4.yaml')
+    model.load('yolo11n.pt') # loading pretrain weights
+    model.train(data='datasets/hit-uav/dataset.yaml',
                 cache=False,
                 imgsz=640,
                 epochs=150,
@@ -19,5 +19,5 @@ if __name__ == '__main__':
                 # amp=False, # close amp | loss出现nan可以关闭amp
                 # fraction=0.2,
                 project='runs/train',
-                name='baseline',
+                name='DCNV4',
                 )

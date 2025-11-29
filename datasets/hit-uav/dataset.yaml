@@ -1,7 +1,7 @@
-path: /tmp/dataset
-train: /tmp/dataset/images/train
-val: /tmp/dataset/images/val
-test: /tmp/dataset/images/test
+path: E:\Project\YOLO11_lightweight\datasets\hit-uav
+train: images/train
+val: images/val
+test: images/test
 names:
   0: Person
   1: Car
