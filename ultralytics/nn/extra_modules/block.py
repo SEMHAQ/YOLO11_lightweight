@@ -69,8 +69,7 @@ from .LWGANet import LWGA_Block
 from .CSSC import CSSC, CNCM
 from .HFRB import HFRB
 from .EVA import EVA
-
-
+from .PlainUSR import RepMBConv, LocalAttention
 
 from ultralytics.utils.ops import make_divisible
 from timm.layers import CondConv2d, trunc_normal_, use_fused_attn, to_2tuple
@@ -106,7 +105,7 @@ __all__ = ['DyHeadBlock', 'DyHeadBlockWithDCNV3', 'Fusion', 'C3k2_Faster', 'C3k2
            'A2C2f_EDFFN', 'C3k2_EBlock', 'C3k2_DBlock', 'C3k2_FDConv', 'C3k2_MambaOut_FDConv', 'C3k2_PFDConv', 'C3k2_PFDConv', 'C3k2_FasterFD', 'C3k2_DSAN', 'C3k2_MambaOut_DSA', 'C3k2_DSA', 'C3k2_DSAN_EDFFN', 'C3k2_RMB', 'SNI', 'GSConvE', 'C3k2_SFSConv', 'C3k2_MambaOut_SFSC',
            'C3k2_MambaOut_SFSC', 'C3k2_PSFSConv', 'C3k2_FasterSFSC', 'FCM', 'FCM_1', 'FCM_2', 'FCM_3', 'Pzconv', 'C3k2_GroupMamba', 'C3k2_GroupMambaBlock', 'C3k2_MambaVision', 'C3k2_wConv', 'wConv2d', 'PST', 'C3k2_FourierConv', 'FourierConv', 'C3k2_GLVSS', 'C3k2_ESC', 'C3k2_MBRConv5',
            'C3k2_MBRConv3', 'C3k2_VSSD', 'C3k2_TVIM', 'DPCF', 'C3k2_CSI', 'C3k2_SHSA_EPGO', 'C3k2_SHSA_EPGO_CGLU', 'C3k2_ConvAttn', 'C3k2_UniConvBlock', 'C3k2_LGLB', 'C3k2_ConverseB', 'C3k2_Converse', 'C3k2_GCConv', 'GCConv', 'MANet_GCConv', 'C3k2_CFBlock', 'C3k2_FMABlock', 'C3k2_LWGA',
-           'C3k2_CSSC', 'C3k2_CNCM', 'C3k2_HFRB', 'C3k2_EVA'
+           'C3k2_CSSC', 'C3k2_CNCM', 'C3k2_HFRB', 'C3k2_EVA', 'C3k2_RMBC', 'C3k2_RMBC_LA'
            ]
 
 def autopad(k, p=None, d=1):  # kernel, padding, dilation
@@ -15432,3 +15431,62 @@ class C3k2_EVA(C3k2):
         self.m = nn.ModuleList(C3k_EVA(self.c, self.c, 2, shortcut, g) if c3k else EVA(self.c, kernel_size=7) for _ in range(n))
 
 ######################################## ICIP2025 BEVANET end ########################################
+        
+######################################## ACCV2024 PlainUSR start ########################################
+
+class Bottleneck_RepMBConv(nn.Module):
+    """Standard bottleneck."""
+
+    def __init__(self, c1, c2, shortcut=True, g=1, k=(3, 3), e=0.5):
+        """Initializes a standard bottleneck module with optional shortcut connection and configurable parameters."""
+        super().__init__()
+        self.cv1 = RepMBConv(c1)
+        self.cv2 = RepMBConv(c2)
+        self.add = shortcut and c1 == c2
+
+    def forward(self, x):
+        """Applies the YOLO FPN to input data."""
+        return x + self.cv2(self.cv1(x)) if self.add else self.cv2(self.cv1(x))
+
+class Bottleneck_RepMBConv_LA(nn.Module):
+    """Standard bottleneck."""
+
+    def __init__(self, c1, c2, shortcut=True, g=1, k=(3, 3), e=0.5):
+        """Initializes a standard bottleneck module with optional shortcut connection and configurable parameters."""
+        super().__init__()
+        self.cv1 = RepMBConv(c1)
+        self.cv2 = RepMBConv(c2)
+        self.add = shortcut and c1 == c2
+        self.attention = LocalAttention(c2)
+
+    def forward(self, x):
+        """Applies the YOLO FPN to input data."""
+        return self.attention(x + self.cv2(self.cv1(x))) if self.add else self.attention(self.cv2(self.cv1(x)))
+
+class C3k_RMBC(C3k):
+    def __init__(self, c1, c2, n=1, shortcut=False, g=1, e=0.5, k=3):
+        super().__init__(c1, c2, n, shortcut, g, e, k)
+        c_ = int(c2 * e)  # hidden channels
+        # kernel_size可选7,11,23,35
+        self.m = nn.Sequential(*(Bottleneck_RepMBConv(c_, c_, shortcut=shortcut, g=g) for _ in range(n)))
+
+class C3k2_RMBC(C3k2):
+    def __init__(self, c1, c2, n=1, c3k=False, e=0.5, g=1, shortcut=True):
+        super().__init__(c1, c2, n, c3k, e, g, shortcut)
+        # kernel_size可选7,11,23,35
+        self.m = nn.ModuleList(C3k_RMBC(self.c, self.c, 2, shortcut, g) if c3k else Bottleneck_RepMBConv(self.c, self.c, shortcut=shortcut, g=g) for _ in range(n))
+
+class C3k_RMBC_LA(C3k):
+    def __init__(self, c1, c2, n=1, shortcut=False, g=1, e=0.5, k=3):
+        super().__init__(c1, c2, n, shortcut, g, e, k)
+        c_ = int(c2 * e)  # hidden channels
+        # kernel_size可选7,11,23,35
+        self.m = nn.Sequential(*(Bottleneck_RepMBConv_LA(c_, c_, shortcut=shortcut, g=g) for _ in range(n)))
+
+class C3k2_RMBC_LA(C3k2):
+    def __init__(self, c1, c2, n=1, c3k=False, e=0.5, g=1, shortcut=True):
+        super().__init__(c1, c2, n, c3k, e, g, shortcut)
+        # kernel_size可选7,11,23,35
+        self.m = nn.ModuleList(C3k_RMBC_LA(self.c, self.c, 2, shortcut, g) if c3k else Bottleneck_RepMBConv_LA(self.c, self.c, shortcut=shortcut, g=g) for _ in range(n))
+
+######################################## ACCV2024 PlainUSR end ########################################

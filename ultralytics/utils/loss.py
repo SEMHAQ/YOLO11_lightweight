@@ -8,7 +8,7 @@ from ultralytics.utils.metrics import OKS_SIGMA
 from ultralytics.utils.ops import crop_mask, xywh2xyxy, xyxy2xywh
 from ultralytics.utils.tal import RotatedTaskAlignedAssigner, TaskAlignedAssigner, dist2bbox, dist2rbox, make_anchors
 from ultralytics.utils.atss import ATSSAssigner, generate_anchors
-from .metrics import bbox_iou, probiou, bbox_mpdiou, bbox_inner_iou, bbox_focaler_iou, bbox_inner_mpdiou, bbox_focaler_mpdiou, wasserstein_loss, WiseIouLoss
+from .metrics import bbox_iou, probiou, bbox_mpdiou, bbox_inner_iou, bbox_focaler_iou, bbox_inner_mpdiou, bbox_focaler_mpdiou, wasserstein_loss, gcd_loss, WiseIouLoss
 from ultralytics.utils.torch_utils import autocast
 
 from .metrics import bbox_iou, probiou
@@ -223,7 +223,9 @@ class BboxLoss(nn.Module):
         
         # NWD
         self.nwd_loss = False
-        self.iou_ratio = 0.5 # total_iou_loss = self.iou_ratio * iou_loss + (1 - self.iou_ratio) * nwd_loss
+        # GCD
+        self.gcd_loss = False
+        self.iou_ratio = 0.5 # total_iou_loss = self.iou_ratio * iou_loss + (1 - self.iou_ratio) * (nwd_loss or gcd_loss)
         
         # WiseIOU
         self.use_wiseiou = False
@@ -251,6 +253,10 @@ class BboxLoss(nn.Module):
             nwd = wasserstein_loss(pred_bboxes[fg_mask], target_bboxes[fg_mask])
             nwd_loss = ((1.0 - nwd) * weight).sum() / target_scores_sum
             loss_iou = self.iou_ratio * loss_iou +  (1 - self.iou_ratio) * nwd_loss
+        elif self.gcd_loss:
+            gcd = gcd_loss(pred_bboxes[fg_mask], target_bboxes[fg_mask])
+            gcd_l = ((1.0 - gcd) * weight).sum() / target_scores_sum * 0.0002
+            loss_iou = self.iou_ratio * loss_iou +  (1 - self.iou_ratio) * gcd_l
 
         # DFL loss
         if self.dfl_loss:
