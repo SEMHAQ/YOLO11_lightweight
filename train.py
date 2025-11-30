@@ -19,5 +19,5 @@ if __name__ == '__main__':
                 # amp=False, # close amp | loss出现nan可以关闭amp
                 # fraction=0.2,
                 project='runs/train',
-                name='Ghost+DCN',
+                name='Ghost-DCN',
                 )
