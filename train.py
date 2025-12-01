@@ -3,7 +3,7 @@ warnings.filterwarnings('ignore')
 from ultralytics import YOLO
 
 if __name__ == '__main__':
-    model = YOLO('ultralytics/cfg/models/11/yolo11-bifpn.yaml')
+    model = YOLO('ultralytics/cfg/models/11/yolo11-C3k2-DynamicConv.yaml')
     # model.load('yolo11n.pt') # loading pretrain weights
     model.train(data='datasets/flow-img/data.yaml',
                 cache=False,
@@ -19,5 +19,5 @@ if __name__ == '__main__':
                 # amp=False, # close amp | loss出现nan可以关闭amp
                 # fraction=0.2,
                 project='runs/train',
-                name='bifpn',
+                name='dynamicconv',
                 )
